@@ -166,7 +166,11 @@ def get_queue(action=None,ret=False):
 
 def main_logic():
     get_queue(pause_remember)
-    copy_files('C:\\Users\\User\\Desktop\\GitHub\\HackPrinterQueue\\new')
+    try:
+        sub.call('mkdir new')
+    except:
+        pass
+    copy_files('.\\new')
     resume_all()
     return
 
